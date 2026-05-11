@@ -807,9 +807,16 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbygHIJCzmktzMqpIgkuF
         This section is for <strong>high quality photos only</strong> — images you'd like African Guide Academy to use for research, species identification, or sharing on social media. Please only upload your best work here.
       </div>
 
-      <div id="cp-no-course" style="text-align:center;padding:24px;color:var(--muted);font-size:0.85rem">
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Select Your Course</label>
+        <select id="cp-course-select" onchange="cpCourseSelected(this.value)" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.85rem;background:var(--white)">
+          <option value="">— Select your course —</option>
+        </select>
+      </div>
+
+      <div id="cp-no-course" style="display:none;text-align:center;padding:24px;color:var(--muted);font-size:0.85rem">
         <div style="font-size:2rem;margin-bottom:8px">📸</div>
-        Please select your course from the dropdown above first.
+        Please select your course above first.
       </div>
 
       <div id="cp-form-wrap" style="display:none">
@@ -2353,21 +2360,23 @@ let cpPhotoFile = null;
 let cpCourse = '';
 
 function initCommunityPhotos() {
-  const sel = document.getElementById('global-course-select');
-  if (sel) {
-    sel.addEventListener('change', function() {
-      cpCourse = sel.value;
-      document.getElementById('cp-no-course').style.display = cpCourse ? 'none' : 'block';
-      document.getElementById('cp-form-wrap').style.display = cpCourse ? 'block' : 'none';
-      if (cpCourse) loadRecentCommunityPhotos(cpCourse);
+  // Populate the community photos course dropdown
+  var sel = document.getElementById('cp-course-select');
+  if (sel && ACTIVE_COURSES) {
+    ACTIVE_COURSES.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c.code;
+      opt.textContent = c.label;
+      sel.appendChild(opt);
     });
-    if (sel.value) {
-      cpCourse = sel.value;
-      document.getElementById('cp-no-course').style.display = 'none';
-      document.getElementById('cp-form-wrap').style.display = 'block';
-      loadRecentCommunityPhotos(cpCourse);
-    }
   }
+}
+
+function cpCourseSelected(code) {
+  cpCourse = code;
+  document.getElementById('cp-no-course').style.display = 'none';
+  document.getElementById('cp-form-wrap').style.display = code ? 'block' : 'none';
+  if (code) loadRecentCommunityPhotos(code);
 }
 
 function cpPhotoSelected(input) {
