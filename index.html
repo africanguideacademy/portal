@@ -1873,42 +1873,7 @@ function postToSheets(payload, callback) {
     if (callback) callback();
     return;
   }
-
-  // If payload has photoData, send it separately to avoid large payload timeout
-  const photoData = payload.data && payload.data.photoData ? payload.data.photoData : '';
-  if (photoData) {
-    const mainPayload = JSON.parse(JSON.stringify(payload));
-    mainPayload.data.photoData = '';
-    // Send sighting first without photo
-    fetch(SHEETS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(mainPayload)
-    }).then(function() {
-      // Then send photo separately
-      fetch(SHEETS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          action: 'uploadSightingPhoto',
-          course: payload.data.course,
-          type: payload.data.type,
-          species: payload.data.species,
-          photoData: photoData
-        })
-      }).then(function() {
-        if (callback) callback();
-      }).catch(function() {
-        if (callback) callback();
-      });
-    }).catch(function() {
-      if (callback) callback();
-    });
-    return;
-  }
-
+  // Send everything in one request — photo is already resized to ~100KB
   fetch(SHEETS_URL, {
     method: 'POST',
     mode: 'no-cors',
