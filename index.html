@@ -542,6 +542,7 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbygHIJCzmktzMqpIgkuF
       <button class="dd-item" onclick="navClose('info')">ℹ️ Course Info</button>
       <button class="dd-item" onclick="navClose('resources')">📚 Resources</button>
       <button class="dd-item" onclick="navClose('profile')">👤 My Profile</button>
+      <button class="dd-item" onclick="navClose('photos')">📸 Community Photos</button>
     </div>
     <div>
       <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);padding:10px 20px 4px">Learn More</div>
@@ -618,6 +619,10 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbygHIJCzmktzMqpIgkuF
         <button class="quick-btn" style="border-top:3px solid var(--gold)" onclick="navToSightings('mammals')">
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
           🦁 Mammal List
+        </button>
+        <button class="quick-btn" style="border-top:3px solid #6C2A1D;grid-column:span 2" onclick="navClose('photos')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#6C2A1D" stroke-width="1.8"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          📸 Community Photos
         </button>
       </div>
 
