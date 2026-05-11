@@ -1636,6 +1636,15 @@ function submitProfile() {
   const submitBtn = document.querySelector('.btn-submit');
   if (submitBtn) { submitBtn.textContent = 'Submitting…'; submitBtn.disabled = true; }
 
+  const readFile = (fileInput) => new Promise(resolve => {
+    const file = fileInput ? fileInput.files[0] : null;
+    if (!file) { resolve(''); return; }
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+
   const uploadDoc = (fileInput, docType) => {
     return new Promise(resolve => {
       const file = fileInput ? fileInput.files[0] : null;
@@ -1652,21 +1661,15 @@ function submitProfile() {
   };
 
   Promise.all([
-    uploadDoc(document.getElementById('f_passport'), 'passport'),
-    uploadDoc(document.getElementById('f_photo'),    'photo'),
-  ]).then(([passportUrl, photoUrl]) => {
-    data.passportUrl = passportUrl;
-    data.photoUrl    = photoUrl;
-    return fetch(SHEETS_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'submitProfile', data })
+    readFile(document.getElementById('f_passport')),
+    readFile(document.getElementById('f_photo')),
+  ]).then(([passportData, photoData]) => {
+    data.passportData = passportData;
+    data.photoData    = photoData;
+    postToSheets({ action:'submitProfile', data }, function() {
+      showProfileSuccess(data);
+      if (submitBtn) { submitBtn.textContent = 'Submit My Profile'; submitBtn.disabled = false; }
     });
-  }).then(r=>r.json()).then(() => {
-    document.getElementById('profileForm').style.display = 'none';
-    document.getElementById('successBox').style.display = 'block';
-  }).catch(() => {
-    alert('There was a problem submitting your profile. Please check your connection and try again.');
-    if (submitBtn) { submitBtn.textContent = 'Submit My Profile'; submitBtn.disabled = false; }
   });
 }
 
@@ -1857,6 +1860,58 @@ function loadAllSightingsForMap(code) {
   ]).then(([bData, mData]) => {
     updateSightMap(bData.sightings||[], mData.sightings||[]);
   });
+}
+
+
+// ── POST TO SHEETS (cross-origin safe via form POST) ──
+function postToSheets(payload, callback) {
+  if (!navigator.onLine) {
+    addToQueue(payload);
+    showOfflineSuccess('Saved offline — will sync when connected.');
+    if (callback) callback();
+    return;
+  }
+  try {
+    var iframe = document.createElement('iframe');
+    iframe.name = 'aga_post_' + Date.now();
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = SHEETS_URL;
+    form.target = iframe.name;
+    form.style.display = 'none';
+
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    iframe.onload = function() {
+      setTimeout(function() {
+        try { document.body.removeChild(form); } catch(e) {}
+        try { document.body.removeChild(iframe); } catch(e) {}
+      }, 500);
+      if (callback) callback();
+    };
+
+    form.submit();
+  } catch(e) {
+    // Fallback to fetch no-cors
+    fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    }).then(() => { if (callback) callback(); }).catch(() => {
+      addToQueue(payload);
+      showOfflineSuccess('Saved offline — will sync when connected.');
+      if (callback) callback();
+    });
+  }
 }
 
 function loadPgSightings(type) {
@@ -2060,27 +2115,14 @@ function submitSighting() {
 
   const doSubmit = (photoUrl) => {
     sighting.photoUrl = photoUrl || '';
-    fetch(SHEETS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'addSighting', data: sighting }),
-    })
-    .then(() => {
+    postToSheets({ action: 'addSighting', data: sighting }, function() {
       closeSightingModal();
       btn.textContent = 'Save Sighting';
       btn.disabled = false;
       setTimeout(() => {
         loadPgSightings(addingSightType);
         if (curSightCourse) loadAllSightingsForMap(curSightCourse);
-      }, 2000);
-    })
-    .catch(() => {
-      addToQueue({ action:'addSighting', data: { ...sighting } });
-      closeSightingModal();
-      btn.textContent = 'Save Sighting';
-      btn.disabled = false;
-      showOfflineSuccess('Sighting queued — will sync when connected.');
+      }, 2500);
     });
   };
 
@@ -2210,11 +2252,9 @@ async function syncQueue() {
         item.data.photoUrl = photoRes.url || '';
         delete item.data.photoData;
       }
-      const res = await fetch(SHEETS_URL, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(item)
-      }).then(r=>r.json());
-      if (res.error) failed.push(item);
+      await new Promise((resolve) => {
+        postToSheets(item, resolve);
+      });
     } catch(e) {
       failed.push(item);
     }
