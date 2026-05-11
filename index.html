@@ -1873,6 +1873,42 @@ function postToSheets(payload, callback) {
     if (callback) callback();
     return;
   }
+
+  // If payload has photoData, send it separately to avoid large payload timeout
+  const photoData = payload.data && payload.data.photoData ? payload.data.photoData : '';
+  if (photoData) {
+    const mainPayload = JSON.parse(JSON.stringify(payload));
+    mainPayload.data.photoData = '';
+    // Send sighting first without photo
+    fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(mainPayload)
+    }).then(function() {
+      // Then send photo separately
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'uploadSightingPhoto',
+          course: payload.data.course,
+          type: payload.data.type,
+          species: payload.data.species,
+          photoData: photoData
+        })
+      }).then(function() {
+        if (callback) callback();
+      }).catch(function() {
+        if (callback) callback();
+      });
+    }).catch(function() {
+      if (callback) callback();
+    });
+    return;
+  }
+
   fetch(SHEETS_URL, {
     method: 'POST',
     mode: 'no-cors',
@@ -1913,7 +1949,7 @@ function showPgSightings(type, sightings) {
     const dateStr = s.date ? new Date(s.date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '';
     return '<div class="sight-card">' +
       '<div class="sight-card-body">' +
-      (s.photoUrl ? '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px"><img src="' + s.photoUrl + '" style="width:64px;height:64px;border-radius:6px;object-fit:cover;border:1px solid #EAD9C8;background:#FAF0E2"><a href="' + s.photoUrl + '" target="_blank" style="font-size:0.65rem;color:#6C2A1D;font-weight:700;text-decoration:none">View</a></div>' : '') +
+      (s.photoUrl ? '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px"><img src="' + s.photoUrl + '" style="width:64px;height:64px;border-radius:6px;object-fit:cover;border:1px solid #EAD9C8;background:#FAF0E2"><a href="' + (s.fullUrl||s.photoUrl) + '" target="_blank" style="font-size:0.65rem;color:#6C2A1D;font-weight:700;text-decoration:none">View</a></div>' : '') +
       '<div style="flex:1;min-width:0">'+
         '<div class="sight-species">' + s.species + '</div>' +
         (s.scientific ? '<div class="sight-sci">' + s.scientific + '</div>' : '') +
@@ -2191,48 +2227,37 @@ async function syncQueue() {
   }
 
   const syncBanner = document.getElementById('sync-banner');
-  syncBanner.textContent = '⏳ Uploading ' + q.length + ' item(s)…';
+  syncBanner.innerHTML = '⏳ Uploading ' + q.length + ' item(s)…';
 
+  let uploaded = 0;
   const failed = [];
+
   for (const item of q) {
-    try {
-      // Handle photo uploads first
-      if (item.action === 'addSighting' && item.data.photoData) {
-        const photoRes = await fetch(SHEETS_URL, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            action:'uploadPhoto', course:item.data.course,
-            type:item.data.type,
-            name: item.data.species.replace(/[^a-z0-9]/gi,'_') + '_' + Date.now(),
-            data: item.data.photoData,
-          })
-        }).then(r=>r.json());
-        item.data.photoUrl = photoRes.url || '';
-        delete item.data.photoData;
-      }
-      await new Promise((resolve) => {
-        postToSheets(item, resolve);
+    await new Promise(resolve => {
+      postToSheets(item, function() {
+        uploaded++;
+        resolve();
       });
-    } catch(e) {
-      failed.push(item);
-    }
+    });
   }
 
   saveQueue(failed);
-  updateQueueUI();
 
-  const uploaded = q.length - failed.length;
   if (failed.length === 0) {
+    saveQueue([]);
     syncBanner.style.background = '#2E7D32';
-    syncBanner.innerHTML = '✅ All ' + uploaded + ' item(s) uploaded successfully!';
+    syncBanner.innerHTML = '✅ ' + uploaded + ' item(s) uploaded!';
     setTimeout(updateQueueUI, 3000);
-    // Refresh the current sightings list
-    if (curSightCourse) loadPgSightings(pgSightType);
+    if (curSightCourse) {
+      loadPgSightings(pgSightType);
+      loadAllSightingsForMap(curSightCourse);
+    }
   } else {
     syncBanner.style.background = '#B71C1C';
-    syncBanner.textContent = '⚠️ ' + uploaded + ' uploaded, ' + failed.length + ' failed — tap to retry';
+    syncBanner.textContent = '⚠️ Some failed — tap to retry';
   }
 }
+
 
 // ── PATCH submitSighting to use queue when offline ──
 const _origDoSubmit = window._origDoSubmit; // placeholder
