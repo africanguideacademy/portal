@@ -1,0 +1,17 @@
+{
+  "name": "AGA Nature Guide Portal",
+  "short_name": "AGA Portal",
+  "description": "African Guide Academy — Nature Guide Course Student Portal",
+  "start_url": "/portal/",
+  "display": "standalone",
+  "background_color": "#F8F5F0",
+  "theme_color": "#6C2A1D",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://www.guidetrainingcourses.com/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
