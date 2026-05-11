@@ -2084,8 +2084,9 @@ function submitSighting() {
     return;
   }
 
-  const doSubmit = (photoUrl) => {
-    sighting.photoUrl = photoUrl || '';
+  const doSubmit = (photoUrl, photoData) => {
+    sighting.photoUrl  = photoUrl  || '';
+    sighting.photoData = photoData || '';
     postToSheets({ action: 'addSighting', data: sighting }, function() {
       closeSightingModal();
       btn.textContent = 'Save Sighting';
@@ -2101,20 +2102,8 @@ function submitSighting() {
     // Convert photo to base64 and send for Drive upload
     const reader = new FileReader();
     reader.onload = e => {
-      fetch(SHEETS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'uploadPhoto',
-          course: curSightCourse,
-          type:   addingSightType,
-          name:   species.replace(/[^a-z0-9]/gi,'_') + '_' + Date.now(),
-          data:   e.target.result,
-        }),
-      })
-      .then(r => r.json())
-      .then(res => doSubmit(res.url || ''))
-      .catch(() => doSubmit(''));
+      // Embed photo data directly in the sighting - no separate upload needed
+      doSubmit('', e.target.result);
     };
     reader.readAsDataURL(sightingPhotoFile);
   } else {
