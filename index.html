@@ -1863,7 +1863,7 @@ function loadAllSightingsForMap(code) {
 }
 
 
-// ── POST TO SHEETS (cross-origin safe via form POST) ──
+// ── POST TO SHEETS ──
 function postToSheets(payload, callback) {
   if (!navigator.onLine) {
     addToQueue(payload);
@@ -1871,47 +1871,18 @@ function postToSheets(payload, callback) {
     if (callback) callback();
     return;
   }
-  try {
-    var iframe = document.createElement('iframe');
-    iframe.name = 'aga_post_' + Date.now();
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = SHEETS_URL;
-    form.target = iframe.name;
-    form.style.display = 'none';
-
-    var input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = JSON.stringify(payload);
-    form.appendChild(input);
-    document.body.appendChild(form);
-
-    iframe.onload = function() {
-      setTimeout(function() {
-        try { document.body.removeChild(form); } catch(e) {}
-        try { document.body.removeChild(iframe); } catch(e) {}
-      }, 500);
-      if (callback) callback();
-    };
-
-    form.submit();
-  } catch(e) {
-    // Fallback to fetch no-cors
-    fetch(SHEETS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload)
-    }).then(() => { if (callback) callback(); }).catch(() => {
-      addToQueue(payload);
-      showOfflineSuccess('Saved offline — will sync when connected.');
-      if (callback) callback();
-    });
-  }
+  fetch(SHEETS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload)
+  }).then(function() {
+    if (callback) callback();
+  }).catch(function() {
+    addToQueue(payload);
+    showOfflineSuccess('Saved offline — will sync when connected.');
+    if (callback) callback();
+  });
 }
 
 function loadPgSightings(type) {
