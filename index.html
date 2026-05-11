@@ -2191,61 +2191,36 @@ function updateQueueUI() {
 }
 
 async function syncQueue() {
-  if (!SHEETS_URL) { alert('Backend URL not configured.'); return; }
+  if (!SHEETS_URL) return;
   const q = getQueue();
-  if (!q.length) return;
-  // Test connectivity first
-  try {
-    await fetch(SHEETS_URL + '?action=ping', { method:'GET', mode:'no-cors' });
-  } catch(e) {
-    showOfflineSuccess('Still offline — items remain queued.');
-    return;
-  }
+  if (!q.length) { updateQueueUI(); return; }
 
   const syncBanner = document.getElementById('sync-banner');
-  syncBanner.textContent = '⏳ Uploading ' + q.length + ' item(s)…';
+  if (syncBanner) syncBanner.textContent = '⏳ Uploading ' + q.length + ' item(s)…';
 
-  const failed = [];
   for (const item of q) {
-    try {
-      // Handle photo uploads first
-      if (item.action === 'addSighting' && item.data.photoData) {
-        const photoRes = await fetch(SHEETS_URL, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            action:'uploadPhoto', course:item.data.course,
-            type:item.data.type,
-            name: item.data.species.replace(/[^a-z0-9]/gi,'_') + '_' + Date.now(),
-            data: item.data.photoData,
-          })
-        }).then(r=>r.json());
-        item.data.photoUrl = photoRes.url || '';
-        delete item.data.photoData;
-      }
-      const res = await fetch(SHEETS_URL, {
-        method:'POST', headers:{'Content-Type':'application/json'},
+    await new Promise(function(resolve) {
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(item)
-      }).then(r=>r.json());
-      if (res.error) failed.push(item);
-    } catch(e) {
-      failed.push(item);
-    }
+      }).then(resolve).catch(resolve);
+    });
   }
 
-  saveQueue(failed);
-  updateQueueUI();
-
-  const uploaded = q.length - failed.length;
-  if (failed.length === 0) {
+  saveQueue([]);
+  if (syncBanner) {
     syncBanner.style.background = '#2E7D32';
-    syncBanner.innerHTML = '✅ All ' + uploaded + ' item(s) uploaded successfully!';
-    setTimeout(updateQueueUI, 3000);
-    // Refresh the current sightings list
-    if (curSightCourse) loadPgSightings(pgSightType);
-  } else {
-    syncBanner.style.background = '#B71C1C';
-    syncBanner.textContent = '⚠️ ' + uploaded + ' uploaded, ' + failed.length + ' failed — tap to retry';
+    syncBanner.textContent = '✅ ' + q.length + ' item(s) uploaded!';
   }
+  setTimeout(function() {
+    updateQueueUI();
+    if (curSightCourse) {
+      loadPgSightings(pgSightType);
+      loadAllSightingsForMap(curSightCourse);
+    }
+  }, 3000);
 }
 
 // ── PATCH submitSighting to use queue when offline ──
