@@ -1,4 +1,4 @@
-const CACHE = 'aga-portal-v1';
+const CACHE = 'aga-portal-v2';
 const OFFLINE_URLS = [
   './',
   './index.html',
@@ -23,10 +23,21 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Only cache GET requests
   if (e.request.method !== 'GET') return;
+  // Never cache API calls to Apps Script
+  if (e.request.url.includes('script.google.com')) return;
   e.respondWith(
     caches.match(e.request).then(cached => {
+      // Always fetch fresh for HTML
+      if (e.request.url.endsWith('.html') || e.request.url.endsWith('/')) {
+        return fetch(e.request).then(response => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE).then(cache => cache.put(e.request, clone));
+          }
+          return response;
+        }).catch(() => cached);
+      }
       if (cached) return cached;
       return fetch(e.request).then(response => {
         if (response && response.status === 200) {
