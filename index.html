@@ -2104,12 +2104,14 @@ function submitSighting() {
     if (sightingPhotoFile) {
       const reader = new FileReader();
       reader.onload = e => {
-        item.data.photoData = e.target.result;
-        addToQueue(item);
-        closeSightingModal();
-        btn.textContent = 'Save Sighting';
-        btn.disabled = false;
-        showOfflineSuccess('Sighting saved — will upload when connected.');
+        resizeImage(sightingPhotoFile, 800, 0.7, function(resized) {
+          item.data.photoData = resized;
+          addToQueue(item);
+          closeSightingModal();
+          btn.textContent = 'Save Sighting';
+          btn.disabled = false;
+          showOfflineSuccess('Sighting saved — will upload when connected.');
+        });
       };
       reader.readAsDataURL(sightingPhotoFile);
     } else {
@@ -2125,6 +2127,7 @@ function submitSighting() {
   const doSubmit = (photoUrl, photoData) => {
     sighting.photoUrl  = photoUrl  || '';
     sighting.photoData = photoData || '';
+    btn.textContent = 'Saving…';
     postToSheets({ action: 'addSighting', data: sighting }, function() {
       closeSightingModal();
       btn.textContent = 'Save Sighting';
@@ -2132,18 +2135,14 @@ function submitSighting() {
       setTimeout(() => {
         loadPgSightings(addingSightType);
         if (curSightCourse) loadAllSightingsForMap(curSightCourse);
-      }, 2500);
+      }, 6000);
     });
   };
 
   if (sightingPhotoFile) {
-    // Convert photo to base64 and send for Drive upload
-    const reader = new FileReader();
-    reader.onload = e => {
-      // Embed photo data directly in the sighting - no separate upload needed
-      doSubmit('', e.target.result);
-    };
-    reader.readAsDataURL(sightingPhotoFile);
+    resizeImage(sightingPhotoFile, 800, 0.7, function(resized) {
+      doSubmit('', resized);
+    });
   } else {
     doSubmit('');
   }
