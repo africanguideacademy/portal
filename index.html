@@ -1865,6 +1865,39 @@ function loadAllSightingsForMap(code) {
 }
 
 
+
+// ── IFRAME POST (no size limit, works cross-origin) ──
+function iframePost(url, data) {
+  try {
+    var iframeName = 'aga_iframe_' + Date.now();
+    var iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    form.target = iframeName;
+    form.style.display = 'none';
+
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(data);
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    iframe.onload = function() {
+      setTimeout(function() {
+        try { document.body.removeChild(form); } catch(e){}
+        try { document.body.removeChild(iframe); } catch(e){}
+      }, 2000);
+    };
+    form.submit();
+  } catch(e) {}
+}
+
 // ── POST TO SHEETS ──
 function postToSheets(payload, callback) {
   if (!navigator.onLine) {
@@ -1873,12 +1906,14 @@ function postToSheets(payload, callback) {
     if (callback) callback();
     return;
   }
-  // Send everything in one request — photo is already resized to ~100KB
+  // Strip photoData — send sighting text only
+  const clean = JSON.parse(JSON.stringify(payload));
+  if (clean.data) clean.data.photoData = '';
   fetch(SHEETS_URL, {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(clean)
   }).then(function() {
     if (callback) callback();
   }).catch(function() {
@@ -2090,17 +2125,36 @@ function submitSighting() {
   }
 
   const doSubmit = (photoUrl, photoData) => {
-    sighting.photoUrl  = photoUrl  || '';
-    sighting.photoData = photoData || '';
+    // Generate unique ID for this sighting
+    const sightingId = sighting.course.replace(/[^a-zA-Z0-9]/g,'_') + '_' +
+      sighting.type + '_' +
+      (sighting.species||'unknown').replace(/[^a-zA-Z0-9]/g,'_') + '_' +
+      Date.now();
+    sighting.sightingId = sightingId;
+    sighting.photoUrl   = photoUrl || '';
+    sighting.photoData  = '';  // never send photo in main request
+
     btn.textContent = 'Saving…';
+
+    // Step 1: Save sighting text to sheet
     postToSheets({ action: 'addSighting', data: sighting }, function() {
+      // Step 2: If photo exists, upload it separately via iframe POST
+      if (photoData) {
+        iframePost(SHEETS_URL, {
+          action: 'uploadAndLinkPhoto',
+          sightingId: sightingId,
+          course: sighting.course,
+          type: sighting.type,
+          photoData: photoData
+        });
+      }
       closeSightingModal();
       btn.textContent = 'Save Sighting';
       btn.disabled = false;
       setTimeout(() => {
         loadPgSightings(addingSightType);
         if (curSightCourse) loadAllSightingsForMap(curSightCourse);
-      }, 6000);
+      }, 8000);
     });
   };
 
